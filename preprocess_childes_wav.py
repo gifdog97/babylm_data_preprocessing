@@ -7,6 +7,7 @@ import wave
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 from tqdm import tqdm
 
 # DOCUMENTATION: """https://talkbank.org/manuals/CHAT.pdf"""
@@ -31,6 +32,8 @@ TIME_RE = re.compile(r"\x15(\d+)_(\d+)\x15")
 CHILDES_ROOT = "/Volumes/data/childes"
 
 # 切り出した音声を書き出すディレクトリ
+OUTPUT_FORMAT = "wav"  # "wav" or "flac"
+
 SEGMENT_DIR = Path("/Volumes/data/childes_segments")
 
 
@@ -138,6 +141,20 @@ def _write_wav_int16(path: Path, audio_int16: np.ndarray, sr: int) -> None:
         wf.writeframes(audio_int16.tobytes())
 
 
+def _write_flac_int16(path: Path, audio_int16: np.ndarray, sr: int) -> None:
+    """
+    PCM int16 を FLAC で保存（libsndfile 経由 / python-soundfile）
+    audio_int16 shape: (n, ch)
+    - ffmpeg を毎回起動しないので桁違いに高速
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # soundfile は (frames, channels) の int16 をそのまま FLAC(PCM_16) で書ける
+    sf.write(
+        file=str(path), data=audio_int16, samplerate=sr, format="FLAC", subtype="PCM_16"
+    )
+
+
 def extract_segments_from_cha_numpy_fast(
     cha_path: str | Path,
     childes_root: Path = Path(CHILDES_ROOT),
@@ -145,7 +162,7 @@ def extract_segments_from_cha_numpy_fast(
 ) -> None:
     """
     1つの .cha から、対応する mp3 を「一回だけデコード」して
-    NumPyでスライスして WAV で高速に切り出す。
+    NumPyでスライスして FLAC で高速に切り出す。
     """
     cha_path = Path(cha_path)
     cha_path_rel = cha_path.relative_to(childes_root)
@@ -201,9 +218,14 @@ def extract_segments_from_cha_numpy_fast(
             continue
 
         seg_idx += 1
-        out_file = out_dir / f"{media_id}_{speaker}_{seg_idx:04d}.wav"
+        out_file = out_dir / f"{media_id}_{speaker}_{seg_idx:04d}.{OUTPUT_FORMAT}"
         segment = pcm[start:end]
-        _write_wav_int16(out_file, segment, sr)
+        if OUTPUT_FORMAT.lower() == "wav":
+            _write_wav_int16(out_file.with_suffix(".wav"), segment, sr)
+        elif OUTPUT_FORMAT.lower() == "flac":
+            _write_flac_int16(out_file.with_suffix(".flac"), segment, sr)
+        else:
+            raise ValueError(f"Unknown OUTPUT_FORMAT={OUTPUT_FORMAT}")
 
     print(f"[OK] {cha_path}: wrote {seg_idx} segments -> {out_dir}")
 

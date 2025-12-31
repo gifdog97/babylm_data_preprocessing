@@ -7,6 +7,7 @@ import wave
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 from tqdm import tqdm
 
 # DOCUMENTATION: """https://talkbank.org/manuals/CHAT.pdf"""
@@ -136,6 +137,16 @@ def _write_wav_int16(path: Path, audio_int16: np.ndarray, sr: int) -> None:
         wf.setsampwidth(2)  # int16
         wf.setframerate(sr)
         wf.writeframes(audio_int16.tobytes())
+def _write_flac_int16(path: Path, audio_int16: np.ndarray, sr: int) -> None:
+    """
+    PCM int16 を FLAC で保存（libsndfile 経由 / python-soundfile）
+    audio_int16 shape: (n, ch)
+    - ffmpeg を毎回起動しないので桁違いに高速
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # soundfile は (frames, channels) の int16 をそのまま FLAC(PCM_16) で書ける
+    sf.write(file=str(path), data=audio_int16, samplerate=sr, format="FLAC", subtype="PCM_16")
 
 
 def extract_segments_from_cha_numpy_fast(
@@ -145,7 +156,7 @@ def extract_segments_from_cha_numpy_fast(
 ) -> None:
     """
     1つの .cha から、対応する mp3 を「一回だけデコード」して
-    NumPyでスライスして WAV で高速に切り出す。
+    NumPyでスライスして FLAC で高速に切り出す。
     """
     cha_path = Path(cha_path)
     cha_path_rel = cha_path.relative_to(childes_root)
@@ -201,9 +212,9 @@ def extract_segments_from_cha_numpy_fast(
             continue
 
         seg_idx += 1
-        out_file = out_dir / f"{media_id}_{speaker}_{seg_idx:04d}.wav"
+        out_file = out_dir / f"{media_id}_{speaker}_{seg_idx:04d}.flac"
         segment = pcm[start:end]
-        _write_wav_int16(out_file, segment, sr)
+        _write_flac_int16(out_file, segment, sr)
 
     print(f"[OK] {cha_path}: wrote {seg_idx} segments -> {out_dir}")
 
