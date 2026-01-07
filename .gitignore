@@ -6,3 +6,5 @@ data_preprocessing/gutenberg/metadata
 babylm_data
 babylm_data.zip
 langid.pybaby
+venv/
+output/
