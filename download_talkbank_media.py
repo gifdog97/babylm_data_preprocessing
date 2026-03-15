@@ -4,14 +4,39 @@ import browser_cookie3
 import requests
 import tbdb  # TBDBpy
 
-# NOTE: Change the subset name as needed
-subset_name = "Eng-UK"  # ["Eng-AAE", "Eng-NA", "Eng-UK"]:
 
+def parse_args():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Download media files from CHILDES using TBDBpy and browser cookies."
+    )
+    parser.add_argument(
+        "--corpus_name",
+        type=str,
+        default="childes",
+        help="Corpus name to download (e.g., childes, phon, homebank)",
+    )
+    parser.add_argument(
+        "--subset_name",
+        type=str,
+        default="Eng-UK",
+        help="Subset name to download (e.g., Eng-AAE, Eng-NA, Eng-UK)",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="/Volumes/data/childes_media",
+        help="Root directory to save downloaded media",
+    )
+    return parser.parse_args()
+
+
+args = parse_args()
 BASE_URL = "https://media.talkbank.org/"
 
-# NOTE: Change the output root directory as needed
-OUT_ROOT = Path(f"/Volumes/data/childes_media/{subset_name}")
-OUT_ROOT.mkdir(exist_ok=True)
+OUT_ROOT = Path(args.output) / args.subset_name
+OUT_ROOT.mkdir(exist_ok=True, parents=True)
 
 # 1. Extract talkbank cookie info from the browser
 # NOTE: change browser from `brave` to anything as needed (chrome, firefox, safari, etc.)
@@ -22,8 +47,8 @@ session.cookies.update(cj)
 
 # 2. Get transcript information using TBDBpy
 spec = {
-    "corpusName": "childes",
-    "corpora": [["childes", subset_name]],
+    "corpusName": args.corpus_name,
+    "corpora": [[args.corpus_name, args.subset_name]],
 }
 transcripts = tbdb.getTranscripts(spec)
 
@@ -47,7 +72,7 @@ for row in transcripts["data"]:
     url = BASE_URL + media_rel + "?f=save"
 
     # ローカルの保存先パス
-    local_rel = media_rel.replace(f"childes/{subset_name}/", "")
+    local_rel = media_rel.replace(f"{args.corpus_name}/{args.subset_name}/", "")
     out_path = OUT_ROOT / local_rel
     if out_path.exists():
         print("SKIP exists:", out_path)
