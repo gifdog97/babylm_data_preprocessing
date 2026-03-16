@@ -227,6 +227,13 @@ def _sanitize_utt_id(s: str) -> str:
     return s
 
 
+def _extract_speaker(line: str) -> str | None:
+    match = re.match(r"^\*(\w+):", line)
+    if not match:
+        return None
+    return match.group(1)
+
+
 def iter_childes_manifest_rows_for_cha(cha_path: Path, audio_rel_path: str):
     """
     1つの .cha から、'*' 行ごとの manifest 行を生成。
@@ -238,6 +245,10 @@ def iter_childes_manifest_rows_for_cha(cha_path: Path, audio_rel_path: str):
     with open(cha_path, "r", encoding="utf-8", errors="ignore") as f:
         for i, line in enumerate(f):
             if not line.startswith("*"):
+                continue
+
+            speaker = _extract_speaker(line)
+            if not speaker:
                 continue
 
             m = TIME_RE.search(line)
@@ -265,6 +276,7 @@ def iter_childes_manifest_rows_for_cha(cha_path: Path, audio_rel_path: str):
             yield {
                 "utt_id": utt_id,
                 "path": audio_path_field,
+                "speaker": speaker,
                 "start_sec": start_sec,
                 "end_sec": end_sec,
                 "text": cleaned,
@@ -290,7 +302,9 @@ def main():
 
         rows.extend(list(iter_childes_manifest_rows_for_cha(cha_path, rel_path)))
 
-    df = pd.DataFrame(rows, columns=["utt_id", "path", "start_sec", "end_sec", "text"])
+    df = pd.DataFrame(
+        rows, columns=["utt_id", "path", "speaker", "start_sec", "end_sec", "text"]
+    )
     df.to_csv(out_path, sep="\t", index=False)
     total_words = df["text"].str.split().str.len().sum()
     total_duration = (df["end_sec"] - df["start_sec"]).sum()
