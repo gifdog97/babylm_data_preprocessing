@@ -234,6 +234,28 @@ def _extract_speaker(line: str) -> str | None:
     return match.group(1)
 
 
+def parse_participants_line(line: str) -> tuple[dict, dict]:
+    # Appropriate case (Child / Adult):
+    # @Participants:  CHI Target_Child, MOT Mother  PAR0 Participant, PAR1 Participant, PAR2 Participant
+    # Inappropriate case (Unknown):
+    # @Participants:  PAR0 Participant, PAR1 Participant, PAR2 Participant
+    participants_raw_role = {}
+    participants_role = {}
+    parts = line.split("\t")[1].split(",")
+    for part in parts:
+        kv = part.strip().split()
+        assert len(kv) == 2
+        label, participant = kv
+        participants_raw_role[label] = participant
+        if "Child" in participant:
+            participants_role[label] = "Child"
+        else:
+            participants_role[label] = "Adult"
+    if all(participants_role[p] == "Adult" for p in participants_role):
+        participants_role = {p: "Unknown" for p in participants_role}
+    return participants_raw_role, participants_role
+
+
 def iter_childes_manifest_rows_for_cha(cha_path: Path, audio_rel_path: str):
     """
     1つの .cha から、'*' 行ごとの manifest 行を生成。
@@ -244,12 +266,18 @@ def iter_childes_manifest_rows_for_cha(cha_path: Path, audio_rel_path: str):
 
     with open(cha_path, "r", encoding="utf-8", errors="ignore") as f:
         for i, line in enumerate(f):
+            if line.startswith("@Participants"):
+                participants_raw_role, participants_role = parse_participants_line(line)
+                continue
+
             if not line.startswith("*"):
                 continue
 
             speaker = _extract_speaker(line)
             if not speaker:
                 continue
+            raw_role = participants_raw_role.get(speaker, "Unknown")
+            role = participants_role.get(speaker, "Unknown")
 
             m = TIME_RE.search(line)
             if not m:
@@ -280,6 +308,8 @@ def iter_childes_manifest_rows_for_cha(cha_path: Path, audio_rel_path: str):
                 "start_sec": start_sec,
                 "end_sec": end_sec,
                 "text": cleaned,
+                "raw_role": raw_role,
+                "role": role,
             }
 
 
@@ -303,7 +333,17 @@ def main():
         rows.extend(list(iter_childes_manifest_rows_for_cha(cha_path, rel_path)))
 
     df = pd.DataFrame(
-        rows, columns=["utt_id", "path", "speaker", "start_sec", "end_sec", "text"]
+        rows,
+        columns=[
+            "utt_id",
+            "path",
+            "speaker",
+            "start_sec",
+            "end_sec",
+            "text",
+            "raw_role",
+            "role",
+        ],
     )
     df.to_csv(out_path, sep="\t", index=False)
     total_words = df["text"].str.split().str.len().sum()
@@ -312,6 +352,7 @@ def main():
     print(f"Total utterances: {len(df)}")
     print(f"Total words: {total_words}")
     print(f"Total duration [sec]: {total_duration:.2f}")
+    print(f"Total duration [hour]: {total_duration / 3600:.2f}")
 
 
 if __name__ == "__main__":
