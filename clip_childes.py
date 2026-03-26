@@ -23,9 +23,6 @@ def _init_shared(shm_name, shape, dtype, sr_, channels_):
 
 def _write_one(args):
     s, e, out = args
-    if Path(out).exists():
-        print(f"File already exists: {out}")
-        return
     i0 = int(SR * s)
     i1 = int(SR * e)
     # スライスは共有メモリ上のビューなのでコピーは最小
@@ -49,6 +46,9 @@ def parse_segments(manifest_path: Path) -> dict[Path, list[tuple[float, float, s
                 float(row["start_sec"]),
                 float(row["end_sec"]),
             )
+            if out_path.exists():
+                print(f"File already exists. Skip it.: {out_path}")
+                continue
             items[wav_path].append((s, e, out_path))
     return items
 
