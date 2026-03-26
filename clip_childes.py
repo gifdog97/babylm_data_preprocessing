@@ -23,6 +23,9 @@ def _init_shared(shm_name, shape, dtype, sr_, channels_):
 
 def _write_one(args):
     s, e, out = args
+    if Path(out).exists():
+        print(f"File already exists: {out}")
+        return
     i0 = int(SR * s)
     i1 = int(SR * e)
     # スライスは共有メモリ上のビューなのでコピーは最小
@@ -30,7 +33,8 @@ def _write_one(args):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     # PCM16で書く（無圧縮WAV。速くて劣化なし）
     sf.write(out, data, SR, subtype="PCM_16")
-    return out
+    print(f"Wrote: {out} (duration: {e - s:.2f}s, frames: {i1 - i0})")
+    return
 
 
 def parse_segments(manifest_path: Path) -> dict[Path, list[tuple[float, float, str]]]:
@@ -99,8 +103,8 @@ def main():
             initializer=_init_shared,
             initargs=(shm.name, shape, dtype, sr, channels),
         ) as pool:
-            for out in pool.imap_unordered(_write_one, segs, chunksize=16):
-                print(out)
+            for _ in pool.imap_unordered(_write_one, segs, chunksize=16):
+                pass
 
         shm.close()
         shm.unlink()
