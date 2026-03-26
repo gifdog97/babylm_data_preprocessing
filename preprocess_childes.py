@@ -236,16 +236,14 @@ def _extract_speaker(line: str) -> str | None:
 
 def parse_participants_line(line: str) -> tuple[dict, dict]:
     # Appropriate case (Child / Adult):
-    # @Participants:  CHI Target_Child, MOT Mother  PAR0 Participant, PAR1 Participant, PAR2 Participant
+    # @Participants:  CHI Target_Child, MOT Mother
     # Inappropriate case (Unknown):
     # @Participants:  PAR0 Participant, PAR1 Participant, PAR2 Participant
     participants_raw_role = {}
     participants_role = {}
     parts = line.split("\t")[1].split(",")
     for part in parts:
-        kv = part.strip().split()
-        assert len(kv) == 2
-        label, participant = kv
+        label, participant = part.strip().split(" ", 1)
         participants_raw_role[label] = participant
         if "Child" in participant:
             participants_role[label] = "Child"
