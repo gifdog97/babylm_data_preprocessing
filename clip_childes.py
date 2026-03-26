@@ -9,13 +9,9 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from utils import get_logger
-
 MANIFEST_PATH = Path("./output/childes_manifest.tsv")
 CHILDES_ROOT = Path("/work/gk77/k77035/dataset/childes/childes_media")
 OUTPUT_DIR = Path("/work/gk77/k77035/dataset/childes/childes_clipped")
-
-logger = get_logger()
 
 
 def _init_shared(shm_name, shape, dtype, sr_, channels_):

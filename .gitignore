@@ -7,4 +7,6 @@ babylm_data
 babylm_data.zip
 langid.pybaby
 venv/
-output/
+output/# pixi environments
+.pixi/*
+!.pixi/config.toml
